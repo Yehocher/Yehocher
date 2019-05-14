@@ -1,8 +1,9 @@
 <template>
     <div>
-        <label v-if="label">{{label}}</label>
-        <div>
+        <label v-if="label" :class="{ 'i-form-item-label-required': isRequired }">{{label}}</label>
+         <div>
             <slot></slot>
+            <div v-if="validateState === 'error'" class="i-form-item-message">{{ validateMessage }}</div>
         </div>
     </div>
 </template>
@@ -15,7 +16,7 @@ export default {
         return {
             validateState: '',  // 校验状态
             validateMessage: '',  // 校验不通过时的提示信息
-
+            isRequired: false,  // 是否为必填
         }
     },
     inject: ['form'],
@@ -54,8 +55,24 @@ export default {
          * @param trigger 校验类型
          * @param callback 回调函数
          */
-        validate(){
-
+        validate(trigger, callback = function () {}){
+            let rules = this.getFilteredRule(trigger);
+            if(!rules || rules.length === 0){
+                return;
+            }
+            //设置状态为校验中
+            this.validateState = 'validating';
+            // 以下为 async-validator 库的调用方法
+            let descriptor = {};
+            let model = {};
+            model[this.prop] = this.fieldValue;
+            descriptor[this.prop] = rules;
+            const validator = new AsyncValidator(descriptor);//作用？
+             validator.validate(model,{ firstFields: true },error=>{
+                this.validateState = !errors ? 'success' : 'error';
+                this.validateMessage = errors ? errors[0].message : '';
+                callback(this.validateMessage);
+            })
         },
         onFieldBlur() {
             //鼠标移开校验
@@ -66,14 +83,37 @@ export default {
             this.validate('change');
         },
         setRules () {
+            let rules = this.getRules();
+            if (rules.length) {
+                rules.every((rule) => {
+                    // 如果当前校验规则中有必填项，则标记出来
+                    this.isRequired = rule.required;
+                });
+            }
+
             this.$on('on-form-blur', this.onFieldBlur);
             this.$on('on-form-change', this.onFieldChange);
         },
+        /// 从 Form 的 rules 属性中，获取当前 FormItem 的校验规则
+        getRules () {
+            let formRules = this.form.rules;
+
+            formRules = formRules ? formRules[this.prop] : [];
+
+            return [].concat(formRules || []);
+        },
+        resetField(){
+            this.validateState = '';
+            this.validateMessage = '';
+            this.form.model[this.prop] = this.initialValue //表单值 重置
+        }
     },
     // 组件渲染时，将实例缓存在 Form 中
     mounted() {
         // 如果没有传入 prop，则无需校验，也就无需缓存
         if(this.prop){
+            // 设置初始值，以便在重置时恢复默认值
+            this.initialValue = this.fieldValue;
             this.dispatch('dpForm', 'on-form-item-add', this);
             this.setRules();
         }
@@ -86,4 +126,12 @@ export default {
 </script>
 <style lang="less">
 
+ .i-form-item-label-required:before {
+    content: '*';
+    color: red;
+  }
+  .i-form-item-message {
+    color: red;
+  }
+  
 </style>
