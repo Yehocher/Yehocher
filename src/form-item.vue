@@ -124,14 +124,14 @@ export default {
     }
 }
 </script>
-<style lang="less">
+<style scoped>
 
- .i-form-item-label-required:before {
+.i-form-item-message {
+color: red;
+}
+.i-form-item-label-required:before {
     content: '*';
     color: red;
-  }
-  .i-form-item-message {
-    color: red;
-  }
+}
   
 </style>
